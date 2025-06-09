@@ -1,9 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
+  <meta charset="UTF-8" />
   <title>Beauty Judge</title>
 </head>
 <body>
-  <h1>Benvenuto nel progetto Beauty Judge</h1>
+  <h1>Benvenuto a Beauty Judge</h1>
+
+  <form id="roleForm">
+    <label>
+      <input type="radio" name="role" value="giudicato" required />
+      Giudicato (carica la tua foto)
+    </label>
+    <br />
+    <label>
+      <input type="radio" name="role" value="giudice" />
+      Giudice (valuta le foto)
+    </label>
+    <br />
+    <button type="submit">Procedi</button>
+  </form>
+
+  <div id="uploadSection" style="display:none;">
+    <h2>Carica la tua foto</h2>
+    <input type="file" id="photoInput" accept="image/*" />
+    <button id="uploadBtn">Carica</button>
+  </div>
+
+  <div id="judgeSection" style="display:none;">
+    <h2>Sei un giudice</h2>
+    <p>Qui vedrai le foto da giudicare (da implementare)</p>
+  </div>
+
+  <script>
+    const roleForm = document.getElementById('roleForm');
+    const uploadSection = document.getElementById('uploadSection');
+    const judgeSection = document.getElementById('judgeSection');
+
+    roleForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const role = document.querySelector('input[name="role"]:checked').value;
+      if (role === 'giudicato') {
+        uploadSection.style.display = 'block';
+        judgeSection.style.display = 'none';
+      } else {
+        uploadSection.style.display = 'none';
+        judgeSection.style.display = 'block';
+      }
+      roleForm.style.display = 'none';
+    });
+  </script>
 </body>
 </html>

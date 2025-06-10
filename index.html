@@ -4,34 +4,25 @@
   <meta charset="UTF-8" />
   <title>Beauty Judge</title>
   <style>
-    body { font-family: sans-serif; text-align: center; background: #111; color: #fff; }
-    img { width: 300px; height: auto; margin: 10px; border-radius: 8px; }
-    button { margin: 5px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
-    #photos div { display: inline-block; margin: 10px; }
-    #uploadBtn[disabled] { opacity: 0.6; cursor: not-allowed; }
+    body { font-family: sans-serif; text-align: center; background: #111; color: #fff; margin:0; padding:0; }
+    #photos { display: flex; justify-content: center; gap: 20px; align-items: center; margin-top: 30px; }
+    .photo-container { position: relative; }
+    img { width: 300px; height: auto; border-radius: 8px; transition: transform 0.5s ease; }
+    button.vote-btn { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); padding: 5px 15px; }
   </style>
 </head>
 <body>
-  <h1>Benvenuto a Beauty Judge</h1>
+  <h1>Beauty Judge</h1>
 
   <form id="roleForm">
-    <label>
-      <input type="radio" name="role" value="giudicato" required />
-      Giudicato (carica la tua foto)
-    </label>
-    <br />
-    <label>
-      <input type="radio" name="role" value="giudice" />
-      Giudice (valuta le foto)
-    </label>
-    <br />
+    <label><input type="radio" name="role" value="giudicato" required /> Giudicato (carica la tua foto)</label><br />
+    <label><input type="radio" name="role" value="giudice" /> Giudice (valuta le foto)</label><br />
     <button type="submit">Procedi</button>
   </form>
 
   <div id="uploadSection" style="display:none;">
     <h2>Carica la tua foto</h2>
-    <input type="file" id="photoInput" accept="image/*" />
-    <br/>
+    <input type="file" id="photoInput" accept="image/*" /><br/>
     <button id="uploadBtn">Carica Foto</button>
     <p id="uploadStatus" style="color: #0f0;"></p>
   </div>
@@ -48,35 +39,24 @@
     const uploadBtn = document.getElementById('uploadBtn');
     const photoInput = document.getElementById('photoInput');
     const uploadStatus = document.getElementById('uploadStatus');
-    const photosContainer = document.getElementById('photos');
 
-    // Memorizza la foto vincente dell'ultimo voto
-    let lastWinner = null;
+    let currentLeft = null; // Salva la foto vincente a sinistra
 
     roleForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const role = document.querySelector('input[name="role"]:checked').value;
       if (role === 'giudicato') {
         uploadSection.style.display = 'block';
-        judgeSection.style.display = 'none';
       } else {
-        uploadSection.style.display = 'none';
         judgeSection.style.display = 'block';
-        lastWinner = null;  // resetto prima di iniziare a votare
-        loadPhotos();
+        loadInitialPhotos();
       }
       roleForm.style.display = 'none';
-      uploadStatus.textContent = '';
-      photoInput.value = '';
-      uploadBtn.disabled = false;
     });
 
     uploadBtn.addEventListener('click', async () => {
       const file = photoInput.files[0];
-      if (!file) {
-        alert('Seleziona una foto prima di caricare.');
-        return;
-      }
+      if (!file) return alert('Seleziona una foto prima di caricare.');
 
       uploadBtn.disabled = true;
       uploadStatus.style.color = '#0f0';
@@ -90,88 +70,90 @@
           method: 'POST',
           body: formData
         });
-
-        if (!response.ok) throw new Error('Server ha risposto con errore.');
-
+        if (!response.ok) throw new Error('Errore dal server');
         const data = await response.json();
-        uploadStatus.textContent = `Foto caricata con successo: ${data.filename}`;
-      } catch (error) {
+        uploadStatus.textContent = `Foto caricata: ${data.filename}`;
+      } catch (err) {
         uploadStatus.style.color = '#f00';
         uploadStatus.textContent = 'Errore durante il caricamento.';
-        console.error(error);
       } finally {
         uploadBtn.disabled = false;
       }
     });
 
-    async function loadPhotos() {
-      photosContainer.innerHTML = '';
-
-      try {
-        // Se ho una foto vincente dell'ultimo turno, carico solo lei + una casuale
-        if (lastWinner) {
-          // Chiedo tutte le foto per scegliere una random esclusa la lastWinner
-          const resAll = await fetch('http://localhost:3000/all-photos');
-          if (!resAll.ok) throw new Error('Errore caricamento foto');
-
-          const allData = await resAll.json();
-          let candidates = allData.photos.filter(p => p !== lastWinner);
-          if (candidates.length === 0) {
-            // Se c'è solo lastWinner, mostro solo quella
-            showPhoto(lastWinner);
-            return;
-          }
-          // prendo una random da candidati
-          const randomPhoto = candidates[Math.floor(Math.random() * candidates.length)];
-          showPhoto(lastWinner);
-          showPhoto(randomPhoto);
-        } else {
-          // Carico due foto random classiche
-          const res = await fetch('http://localhost:3000/random-photos');
-          if (!res.ok) throw new Error('Errore caricamento foto');
-          const data = await res.json();
-
-          if (!data.photos || data.photos.length === 0) {
-            photosContainer.textContent = 'Nessuna foto disponibile al momento.';
-            return;
-          }
-
-          data.photos.forEach(photo => showPhoto(photo));
-        }
-      } catch (error) {
-        photosContainer.textContent = 'Impossibile caricare le foto.';
-        console.error(error);
+    async function loadInitialPhotos() {
+      const photos = await getRandomPhotos(2);
+      if (photos.length < 2) {
+        document.getElementById('photos').textContent = 'Non ci sono abbastanza foto.';
+        return;
       }
+      currentLeft = photos[0];
+      showPhotos(currentLeft, photos[1]);
     }
 
-    function showPhoto(photo) {
-      const img = document.createElement('img');
-      img.src = `http://localhost:3000/uploads/${photo}`;
-      img.alt = 'Foto da giudicare';
-
-      const btn = document.createElement('button');
-      btn.textContent = 'Vota';
-      btn.onclick = () => vote(photo);
-
-      const div = document.createElement('div');
-      div.appendChild(img);
-      div.appendChild(btn);
-      photosContainer.appendChild(div);
+    async function getRandomPhotos(num) {
+      const res = await fetch('http://localhost:3000/all-photos');
+      const data = await res.json();
+      return shuffleArray(data.photos).slice(0, num);
     }
 
-    async function vote(winner) {
-      alert(`Hai votato per ${winner}`);
+    function shuffleArray(arr) {
+      return arr.map(value => ({ value, sort: Math.random() }))
+                .sort((a, b) => a.sort - b.sort)
+                .map(({ value }) => value);
+    }
+
+    function showPhotos(left, right) {
+      const container = document.getElementById('photos');
+      container.innerHTML = '';
+
+      [left, right].forEach((photo, idx) => {
+        const div = document.createElement('div');
+        div.className = 'photo-container';
+
+        const img = document.createElement('img');
+        img.src = `http://localhost:3000/uploads/${photo}`;
+        img.alt = 'Foto';
+
+        const btn = document.createElement('button');
+        btn.className = 'vote-btn';
+        btn.textContent = 'Vota';
+        btn.onclick = () => vote(photo, idx === 1);
+
+        div.appendChild(img);
+        div.appendChild(btn);
+        container.appendChild(div);
+      });
+    }
+
+    async function vote(selected, wasRight) {
       try {
         await fetch('http://localhost:3000/vote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ winner })
+          body: JSON.stringify({ winner: selected })
         });
-        lastWinner = winner; // aggiorno la foto vincente
-      } catch (error) {
-        console.error('Errore invio voto:', error);
+      } catch (err) {
+        console.error('Errore invio voto:', err);
       }
-      loadPhotos();
+
+      if (wasRight) {
+        animateRightToLeft();
+        currentLeft = selected; // Il destro vince → diventa sinistro
+      }
+
+      const [newRight] = await getRandomPhotos(1);
+      showPhotos(currentLeft, newRight);
+    }
+
+    function animateRightToLeft() {
+      const imgs = document.querySelectorAll('#photos img');
+      if (imgs.length < 2) return;
+
+      imgs[1].style.transform = 'translateX(-320px)';
+      setTimeout(() => {
+        imgs[1].style.transform = 'translateX(0)';
+      }, 500);
     }
   </script>
 </body>
